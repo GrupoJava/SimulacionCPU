@@ -10,6 +10,7 @@
 # Importando Modulos
 import simpy
 import random
+import math
 
 # definiendo Proceso y recibe como parámetros:
 #   env: el ambiente creado | noProceso: el número del proceso | cpu: procesador |
@@ -17,6 +18,7 @@ import random
 #   cantInstrucciones: el total de instrucciones que realizará el proceso
 def proceso(env, noProceso, cpu, llegadaP, cantMem,ram,cantInstrucciones):
     global tiempoTotal
+    global tiempos
     
     # Simula la creacion del proeceso
     yield env.timeout(llegadaP)
@@ -40,17 +42,20 @@ def proceso(env, noProceso, cpu, llegadaP, cantMem,ram,cantInstrucciones):
         
             # Realizar instruciones
             # Se solicita que el CPU realice 3 instrcciones por unidad de tiempo
-            if (cantInstrucciones-realizadas)>3: # Si el proceso requiere más de 3 instrucciones
-                realizar = 3 # Solo puede realizar 3 instrucciones
-                # Muestra las instrucciones procesadas (3)
+
+            # i es la cantidad de insturcciones a ejecutar por el procesador
+            i = 3.0 # si se quiere cambiar la velocidad de procesador basta con cambiar el valor --> debe estar en flotante
+            if (cantInstrucciones-realizadas)>i: # Si el proceso requiere más de i (3) instrucciones
+                realizar = i # Solo puede realizar i (3) instrucciones
+                # Muestra las instrucciones procesadas i (3)
                 print('%s | procesando %d instrucciones [running]' % (noProceso, realizar))
-                yield env.timeout(realizar/3.0) # Si son menos de 3 instruccinoes, lo realiza en menos de 1 unidad de tiempo
+                yield env.timeout(realizar/i) # Si son menos de i (3) instruccinoes, lo realiza en menos de 1 unidad de tiempo
                 
-            else: # Si el proceso requiere 3 instrucciones o menos o le fantan instrucciones
+            else: # Si el proceso requiere i (3) instrucciones o menos o le fantan instrucciones
                 realizar = cantInstrucciones-realizadas
                 # Muestra las instrucciones procesadas
                 print('%s | procesando %d instrucciones [running]' % (noProceso, realizar))
-                yield env.timeout(realizar/3.0) # Si son 3 instrucciones, lo realiza en 1 unidad de tiempo
+                yield env.timeout(realizar/i) # Si son i (3) instrucciones, lo realiza en 1 unidad de tiempo
                 break
             
             # Variable contadora que indica la cantidad de instrucciones realizadas
@@ -86,6 +91,7 @@ def proceso(env, noProceso, cpu, llegadaP, cantMem,ram,cantInstrucciones):
     
     tiempoCorrida = env.now - tiempoCreado    # El tiempo de Corrida de un proceso
     tiempoTotal = tiempoTotal + tiempoCorrida # tiempoTotal para calcular el promedio
+    tiempos.append(tiempoCorrida) #Aquí se van agregando los valores a una matriz para calcular la desviación Estándar
 
     #print ("Total: %f" % (tiempoTotal))        
             ## yield ram.get(45)
@@ -97,7 +103,7 @@ env = simpy.Environment()
 #En esta linea se definen las Colas. Se define para tenerlas en el mismo ambiente que creamos 
 #Hay 3 tipos de colas --> simpy.Resource es un tipo, Container otro tipo.
 
-cpu = simpy.Resource(env, capacity=2) # cpu
+cpu = simpy.Resource(env, capacity=1) # cpu
 ram = simpy.Container(env, init=100, capacity= 100)# memoria ram 
 wait = simpy.Resource(env, capacity = 1) # cola de wait para las fuciones I/O
 
@@ -106,9 +112,9 @@ tiempoTotal = 0.0
 RANDOM_SEED = 200
 random.seed(RANDOM_SEED)
 interval = 10   #Para la simulación del tiempo de creacion del proceso
-
+tiempos =[] # lista para guardar los valores de los tiempos de Corrida
 # crear los nuevos procesos que llegarán
-n = 50
+n = 100
 for i in range(n):
     #la mejor forma de simular llegadas es la distrubucion exponencial
     tCreacion = random.expovariate(1.0 / interval) #simulando las llegadas
@@ -119,7 +125,29 @@ for i in range(n):
     env.process(proceso(env, 'Proceso %d' % i, cpu, tCreacion, cantMem, ram, cantInstrucciones))
 
     
-    
 # correr la simulacion
 env.run()
-print('Promedio por proceso: %f' %(tiempoTotal/n))
+
+#Imprime el promedio
+promedio = tiempoTotal/n
+print('Promedio por proceso: %f' %(promedio))
+
+#Calcula la desviación estándar
+sumatoria = [] #Un arreglo para luego hacer los cálculos (Xi - Xprom)^2
+op1 = 0.0
+op2 = 0.0
+for i in range(n):
+    op1 = (tiempos[i] - promedio)**2 # op1 es (Xi - Xprom)^2 donde Xi es tiempoCorrida y Xprom es promedio
+    sumatoria.append(op1) # Guarda los valores ya operados
+    op2 = op2 + sumatoria[i] # Esta variable corresponde a "Sumatoria i a n de (Xi - Xprom)^2" en la formula de desv Estandar
+
+op3 = (op2/(n-1)) # (Sumatoria de valores) / n-1
+desvEst = math.sqrt(op3) # El valor que quda es la varianza al cuadrado, la desviación es la raíz de este valor
+
+#print(tiempos)     # si se quiere ver la lista de tiempos de corrda --> Tiempo corrida = Xi
+#print (sumatoria)  # si se quiere ver la lista de (Xi - Xprom)^2
+#print (op2)        # si se quiere ver la sumatoria de los valores (Xi - Xprom)^2
+#print (op3)        # Este valor es la varianza al cuadrado
+
+#imprime la desviación Estándar
+print ('La desviación estándar es: %f' %(desvEst))
